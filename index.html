@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>ULTRA-ZOMBIE: ROBLOX 3D ENDING</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#09111e;overflow:hidden;font-family:monospace;color:#fff;user-select:none}
+#ui{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:20px}
+#sub{align-self:center;background:rgba(0,0,0,.78);border:2px solid #0f0;padding:12px 22px;font-size:16px;text-align:center;max-width:680px;color:#fff}
+#end{position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;justify-content:center;align-items:center;opacity:0;transition:opacity 1.5s;pointer-events:none}
+#end.show{opacity:1;pointer-events:auto}
+#end h1{font-size:64px;color:#0f0;letter-spacing:8px;text-shadow:0 0 20px #0f0}
+button{margin-top:20px;padding:12px 28px;font-size:18px;font-family:inherit;font-weight:bold;background:#090;color:#fff;border:2px solid #fff;cursor:pointer;pointer-events:auto}
+</style>
+</head>
+<body>
+<div id="ui">
+  <div><button type="button" onclick="startMusic()" style="margin:0;padding:8px 14px;font-size:13px">ВКЛЮЧИТЬ МУЗЫКУ</button></div>
+  <div id="sub">ГОРОД ОСВОБОЖДЁН! НАЧИНАЕТСЯ ПОБЕДНЫЙ ПАРАД...</div>
+</div>
+<div id="end">
+  <h1>THE END</h1>
+  <p style="color:#aaa;margin-top:10px;font-size:16px">Антидот создан. Человечество спасено.</p>
+  <button type="button" onclick="location.reload()">ПОВТОРИТЬ КАТСЦЕНУ</button>
+</div>
+
+<script src="https://jsdelivr.net"></script>
+<script>
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x16263d);
+scene.fog=new THREE.Fog(0x16263d,25,85);
+
+const camera=new THREE.PerspectiveCamera(60,window.innerWidth/window.innerHeight,0.1,150);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+window.onresize=()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);};
+
+// Освещение
+scene.add(new THREE.AmbientLight(0xffffff,0.65));
+const dir=new THREE.DirectionalLight(0xfff5e0,0.9);
+dir.position.set(15,30,20);
+scene.add(dir);
+
+// Текстура шипов Roblox (Studs)
+function makeStudTex(hex){
+  const cv=document.createElement('canvas');cv.width=cv.height=64;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle=hex;ctx.fillRect(0,0,64,64);
+  ctx.fillStyle='rgba(255,255,255,0.16)';ctx.beginPath();ctx.arc(32,32,16,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.22)';ctx.lineWidth=2;ctx.stroke();
+  const t=new THREE.CanvasTexture(cv);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  return t;
+}
+
+// 3D-локация Roblox: площадь, трава и здания
+const grassTex=makeStudTex('#2b7a2b');grassTex.repeat.set(40,40);
+const ground=new THREE.Mesh(new THREE.BoxGeometry(100,1,100),new THREE.MeshLambertMaterial({map:grassTex}));
+ground.position.y=-0.5;scene.add(ground);
+
+const roadTex=makeStudTex('#444852');roadTex.repeat.set(6,40);
+const road=new THREE.Mesh(new THREE.BoxGeometry(14,0.1,100),new THREE.MeshLambertMaterial({map:roadTex}));
+road.position.y=0.05;scene.add(road);
+
+const bColors=new Array('#8c3b3b','#3b5e8c','#8c7a3b','#595966');
+for(let i=-3;i<=3;i++){
+  if(i==0)continue;
+  new Array(-13,13).forEach((bx,si)=>{
+    const h=8+Math.abs(i*3)%10;
+    const bMat=new THREE.MeshLambertMaterial({color:bColors.slice((Math.abs(i)+si)%4).shift()});
+    const bld=new THREE.Mesh(new THREE.BoxGeometry(8,h,9),bMat);
+    bld.position.set(bx,h/2,i*12);
+    scene.add(bld);
+  });
+}
+
+// Конструктор блочного 3D-персонажа Roblox R6
+function createR6(opts){
+  const root=new THREE.Group();
+  const matH=new THREE.MeshLambertMaterial({color:opts.head||0xffd900});
+  const matT=new THREE.MeshLambertMaterial({color:opts.torso||0x2277cc});
+  const matL=new THREE.MeshLambertMaterial({color:opts.legs||0x223344});
+  const matA=new THREE.MeshLambertMaterial({color:opts.arms||opts.head||0xffd900});
+
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.3,0.6),matT);
+  torso.position.y=1.85;root.add(torso);
+
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.85,0.85,0.85),matH);
+  head.position.y=2.95;root.add(head);
+
+  if(opts.helmet){
+    const helm=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.45,0.95),new THREE.MeshLambertMaterial({color:0x2d4c22}));
+    helm.position.y=3.25;root.add(helm);
+  }
+
+  function limb(w,h,d,mat,x,y){
+    const piv=new THREE.Group();piv.position.set(x,y,0);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+    m.position.y=-h/2;piv.add(m);root.add(piv);return piv;
+  }
+  const lLeg=limb(0.55,1.2,0.55,matL,-0.32,1.2);
+  const rLeg=limb(0.55,1.2,0.55,matL,0.32,1.2);
+  const lArm=limb(0.5,1.2,0.5,matA,-0.9,2.45);
+  const rArm=limb(0.5,1.2,0.5,matA,0.9,2.45);
+
+  scene.add(root);
+  return {root,lLeg,rLeg,lArm,rArm};
+}
+
+// 1. Толпа жителей вдоль дороги (аплодируют и прыгают)
+const crowd=new Array();
+const shirtCols=new Array(0xe63946,0x457b9d,0xffbe0b,0x8338ec,0x06d6a0,0xfb5607,0xffffff);
+for(let i=0;i<36;i++){
+  const side=i%2==0?-1:1;
+  const col=shirtCols.slice(i%shirtCols.length).shift();
+  const rig=createR6({torso:col,legs:0x2b2d42});
+  rig.root.position.set(side*(7.8+(i%3)*1.1),-16+Math.floor(i/2)*2.1,0);
+  rig.root.position.set(side*(7.8+(i%3)*1.1),0,-16+Math.floor(i/2)*2.1);
+  rig.root.rotation.y=side==-1?Math.PI/2:-Math.PI/2;
+  crowd.push({rig,ph:i*0.6});
+}
+
+// 2. Военный парад марширует по центру дороги
+const soldiers=new Array();
+for(let r=0;r<4;r++){
+  for(let col=-1;col<=1;col++){
+    const s=createR6({torso:0x386641,arms:0x386641,legs:0x1b4332,helmet:1});
+    s.root.position.set(col*2.2,0,-24-r*3.5);
+    soldiers.push({rig:s,ph:r*0.5});
+  }
+}
+
+// 3. Полевая лаборатория и Учёный с антидотом в конце площади
+const labTable=new THREE.Mesh(new THREE.BoxGeometry(3.6,1.1,1.6),new THREE.MeshLambertMaterial({color:0xdde2e8}));
+labTable.position.set(0,0.55,15);scene.add(labTable);
+
+const vial=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.65,12),new THREE.MeshBasicMaterial({color:0x00ff44}));
+vial.position.set(0,1.45,14.8);scene.add(vial);
+
+const scientist=createR6({torso:0xffffff,arms:0xffffff,legs:0x1d3557});
+scientist.root.position.set(0,0,16.2);
+scientist.root.rotation.y=Math.PI;
+
+// Салют в 3D-небе
+const fireworks=new Array();
+function spawnFW(){
+  const cx=(Math.random()-0.5)*28,cy=12+Math.random()*8,cz=(Math.random()-0.5)*25;
+  const col=shirtCols.slice(Math.floor(Math.random()*shirtCols.length)).shift();
+  for(let i=0;i<16;i++){
+    const a=i*Math.PI*2/16,b=(Math.random()-0.5)*Math.PI;
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.35,0.35,0.35),new THREE.MeshBasicMaterial({color:col}));
+    m.position.set(cx,cy,cz);scene.add(m);
+    fireworks.push({m,vx:Math.cos(a)*Math.cos(b)*0.22,vy:Math.sin(b)*0.22,vz:Math.sin(a)*Math.cos(b)*0.22,life:55});
+  }
+}
+
+let ac=null;
+function startMusic(){
+  try{
+    if(!ac)ac=new(window.AudioContext||window.webkitAudioContext)();
+    if(ac.state=='suspended')ac.resume();
+    const notes=new Array(523,659,784,1046,784,1046);
+    notes.forEach((f,i)=>{
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.type='square';o.frequency.value=f;
+      g.gain.setValueAtTime(0.08,ac.currentTime+i*0.22);
+      g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+i*0.22+0.2);
+      o.connect(g);g.connect(ac.destination);
+      o.start(ac.currentTime+i*0.22);o.stop(ac.currentTime+i*0.22+0.21);
+    });
+  }catch(e){}
+}
+
+const sub=document.getElementById('sub'),endDiv=document.getElementById('end');
+let t=0,ended=0;
+
+function animate(){
+  requestAnimationFrame(animate);
+  t+=0.016;
+
+  // Анимация аплодисментов толпы (подпрыгивают и хлопают руками перед собой)
+  crowd.forEach(c=>{
+    const p=t*6+c.ph;
+    c.rig.root.position.y=Math.abs(Math.sin(p))*0.35;
+    c.rig.lArm.rotation.x=-1.4;
+    c.rig.rArm.rotation.x=-1.4;
+    c.rig.lArm.rotation.z=-0.35+Math.sin(p*2)*0.3;
+    c.rig.rArm.rotation.z=0.35-Math.sin(p*2)*0.3;
+  });
+
+  // Марш военных по площади
+  soldiers.forEach(s=>{
+    s.rig.root.position.z+=0.045;
+    if(s.rig.root.position.z>10)s.rig.root.position.z=-26;
+    const sw=Math.sin(t*8+s.ph)*0.65;
+    s.rig.lLeg.rotation.x=sw;
+    s.rig.rLeg.rotation.x=-sw;
+    s.rig.lArm.rotation.x=-sw*0.8;
+    s.rig.rArm.rotation.x=sw*0.8;
+  });
+
+  // Салют
+  if(Math.random()<0.05)spawnFW();
+  for(let i=fireworks.length-1;i>=0;i--){
+    const f=fireworks.slice(i,i+1).shift();
+    f.m.position.x+=f.vx;f.m.position.y+=f.vy;f.m.position.z+=f.vz;
+    f.vy-=0.004;f.life--;
+    if(f.life<=0){scene.remove(f.m);fireworks.splice(i,1);}
+  }
+
+  // Сюжетные фазы камеры и учёного
+  if(t<7){
+    sub.innerText='ВОЕННЫЙ ПАРАД ПОБЕДЫ! ЖИТЕЛИ АПЛОДИРУЮТ ГЕРОЯМ!';
+    camera.position.set(Math.sin(t*0.3)*10,6.5,-10+t*1.5);
+    camera.lookAt(0,2,t*1.2-4);
+  }else if(t<13){
+    sub.innerText='УЧЁНЫЙ В ЛАБОРАТОРИИ СИНТЕЗИРУЕТ АНТИДОТ ОТ ЗАРАЖЕНИЯ НА БУДУЩЕЕ...';
+    camera.position.set(4.5,3.6,11.5);
+    camera.lookAt(0,2.2,15.5);
+    scientist.lArm.rotation.x=-1.1+Math.sin(t*10)*0.35;
+    scientist.rArm.rotation.x=-1.1-Math.sin(t*10)*0.35;
+    vial.rotation.y+=0.08;
+  }else{
+    sub.innerText='АНТИДОТ ГОТОВ! ГОРОД НАВСЕГДА ЗАЩИЩЁН ОТ ВИРУСА!';
+    camera.position.set(2.5,3.2,12.2);
+    camera.lookAt(0,2.6,15.8);
+    scientist.rArm.rotation.x=-2.7;
+    vial.position.set(-0.9,3.5,16.1);
+    if(t>15.5&&!ended){
+      ended=1;
+      startMusic();
+      endDiv.classList.add('show');
+    }
+  }
+
+  renderer.render(scene,camera);
+}
+animate();
+</script>
+</body>
+</html>
